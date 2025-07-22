@@ -1,14 +1,12 @@
 from fastapi import FastAPI, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
-from clerk_backend_api import Clerk
-import os
-
-clerk_sdk = Clerk(bearer_auth=os.getenv("ClERK_SECRET_KEY"))
+from fastapi.middleware.cors import CORSMiddleware #Cross-Orgin Resource Sharing
 
 app = FastAPI()
 
+#middleware controls which origins/domains are allowed access the APP.
 app.add_middleware(CORSMiddleware,
-                   allow_orgins=["*"], 
+                   allow_orgins=["*"], #all websites/domains allowed
                    allow_credentials=True, 
-                   allow_methods=["*"], 
-                   allow_headers=["*"])
+                   allow_methods=["*"], #all HTTP methods allowed ('GET', 'POST', 'PUT', etc.)
+                   allow_headers=["*"]) #allows requests to include headers (contains data, Ex: Content-Type)
+
