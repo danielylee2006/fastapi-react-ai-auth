@@ -12,6 +12,7 @@ from ..utils import authenticate_and_get_user_details
 from ..database.models import get_db
 import json #handling json data
 from datetime import datetime
+from ..ai_generator import generate_challenge_with_ai
 
 router = APIRouter() #Modular router to organize routes
 
@@ -41,18 +42,41 @@ async def generate_challenge(request: ChallengeRequest, db:Session = Depends(get
         
         quota = reset_quota_if_needed(db, quota)
 
-        if quota.remaining_quota <= 0: 
+        if quota.quota_remaining <= 0: 
             raise HTTPException(status_code=429 , details="Quota exhasted")
         
-        challenge_data = None
+        challenge_data = generate_challenge_with_ai(request.difficulty)
 
+        #adds new Challenge Object to the database via create_challenge helper function
+        #stores the new challenge object in the new_challenge to use in JSON that we are going to return to frontend
+        new_challenge = create_challenge(
+            db=db, 
+            difficulty=request.difficulty,
+            created_by=user_id,
+            **challenge_data #fill in rest of challenge data with challenge_data (obj stored variable)
+        )
+
+        #reduces remaining quota by one every time a POST request (/generate-challenge) called
         quota.quota_remaining -= 1
+
+        #this commit updates quota_remaning and the added new challenge in the DB.
         db.commit()
 
-        return challenge_data
+        #return Challenge JSON object to the frontend
+        return {
+
+            "id" : new_challenge.id,
+            "difficulty": request.difficulty,
+            "title" : new_challenge.title,
+            "options" : json.loads(new_challenge.options), #in the LLM prompt options are generated as strings, so we convert them to JSON
+            "correct_answer_id": new_challenge.correct_answer_id,
+            "explanation": new_challenge.explanation,
+            "timestamp" : new_challenge.date_created.isoformat()
+
+        }
 
     except Exception as e:
-        raise HTTPException(status_code=400, details=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
                         
 
 #Fetches all the challenges created by the user
